@@ -4,8 +4,9 @@
   "description": "Practice reading piano notes with a MIDI keyboard.",
   "start_url": "./",
   "scope": "./",
-  "display": "standalone",
-  "orientation": "any",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
   "background_color": "#fffdf7",
   "theme_color": "#fffdf7",
   "icons": [

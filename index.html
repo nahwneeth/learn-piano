@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#fffdf7">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Piano Notes">
@@ -29,6 +30,7 @@
       height: 100dvh;
       margin: 0;
       overflow: hidden;
+      overscroll-behavior: none;
       color: var(--ink);
       background: #fffdf7;
       font: 16px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -185,6 +187,7 @@
             <option value="shown">Shown</option>
           </select>
         </label>
+        <button id="fullscreen" type="button">Enter fullscreen</button>
         <button id="new-note" type="button">Skip note</button>
         <div class="midi-panel">
           <button class="primary" id="enable-midi" type="button">Connect MIDI keyboard</button>
@@ -242,6 +245,7 @@
     const elements = {
       clef: document.querySelector("#clef"),
       labels: document.querySelector("#labels"),
+      fullscreen: document.querySelector("#fullscreen"),
       newNote: document.querySelector("#new-note"),
       enableMidi: document.querySelector("#enable-midi"),
       midiDevice: document.querySelector("#midi-device"),
@@ -423,13 +427,34 @@
       }
     }
 
+    async function toggleFullscreen() {
+      try {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+        } else {
+          await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+        }
+      } catch (error) {
+        elements.midiStatus.textContent = "Android did not allow fullscreen mode.";
+      }
+    }
+
+    function updateFullscreenButton() {
+      elements.fullscreen.textContent = document.fullscreenElement
+        ? "Exit fullscreen"
+        : "Enter fullscreen";
+    }
+
     elements.enableMidi.addEventListener("click", enableMidi);
     elements.midiDevice.addEventListener("change", selectMidiInput);
+    elements.fullscreen.addEventListener("click", toggleFullscreen);
+    document.addEventListener("fullscreenchange", updateFullscreenButton);
     elements.newNote.addEventListener("click", chooseExercise);
     elements.clef.addEventListener("change", chooseExercise);
     elements.labels.addEventListener("change", renderExercise);
 
     chooseExercise();
+    elements.fullscreen.hidden = !document.fullscreenEnabled;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
