@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fffdf7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Piano Notes">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+  <title>Piano Note Trainer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18222d;
+      --muted: #687481;
+      --accent: #3768cc;
+      --correct: #16794a;
+      --wrong: #bd2c31;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      margin: 0;
+      overflow: hidden;
+      color: var(--ink);
+      background: #fffdf7;
+      font: 16px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: 100%;
+      height: 100%;
+    }
+
+    .settings {
+      position: fixed;
+      top: max(14px, env(safe-area-inset-top));
+      right: max(14px, env(safe-area-inset-right));
+      z-index: 2;
+    }
+
+    .settings summary {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      margin-left: auto;
+      border: 1px solid #cbc6ba;
+      border-radius: 50%;
+      color: var(--ink);
+      background: rgb(255 255 255 / 92%);
+      box-shadow: 0 5px 18px rgb(24 34 45 / 12%);
+      cursor: pointer;
+      font-size: 1.4rem;
+      list-style: none;
+    }
+
+    .settings summary::-webkit-details-marker { display: none; }
+
+    .settings-panel {
+      width: min(320px, calc(100vw - 28px));
+      display: grid;
+      gap: 14px;
+      margin-top: 10px;
+      padding: 20px;
+      border: 1px solid #d5d0c5;
+      border-radius: 16px;
+      background: white;
+      box-shadow: 0 16px 40px rgb(24 34 45 / 18%);
+    }
+
+    .settings-panel h1 {
+      margin: 0 0 2px;
+      font-size: 1.1rem;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    select,
+    button {
+      min-height: 44px;
+      border: 1px solid #c8c4ba;
+      border-radius: 10px;
+      padding: 0 12px;
+      color: var(--ink);
+      background: white;
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    button.primary {
+      border-color: var(--accent);
+      color: white;
+      background: var(--accent);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .midi-panel {
+      display: grid;
+      gap: 10px;
+      padding-top: 4px;
+      border-top: 1px solid #e5e0d6;
+    }
+
+    #midi-device {
+      width: 100%;
+      min-width: 0;
+    }
+
+    #midi-status {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .staff-card {
+      width: 100%;
+      height: 100%;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    @media (max-width: 600px) {
+      .settings summary {
+        width: 44px;
+        height: 44px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <details class="settings">
+      <summary aria-label="Open settings">⚙</summary>
+      <div class="settings-panel">
+        <h1>Settings</h1>
+        <label>
+          Clef
+          <select id="clef">
+            <option value="both">Treble + bass</option>
+            <option value="treble">Treble (G clef)</option>
+            <option value="bass">Bass (F clef)</option>
+          </select>
+        </label>
+        <label>
+          Note label
+          <select id="labels">
+            <option value="hidden">Hidden</option>
+            <option value="shown">Shown</option>
+          </select>
+        </label>
+        <button id="new-note" type="button">Skip note</button>
+        <div class="midi-panel">
+          <button class="primary" id="enable-midi" type="button">Connect MIDI keyboard</button>
+          <select id="midi-device" aria-label="MIDI input device" disabled>
+            <option>No MIDI input connected</option>
+          </select>
+          <p id="midi-status">Connect a USB/Bluetooth MIDI keyboard to begin.</p>
+        </div>
+      </div>
+    </details>
+
+    <section class="staff-card" aria-label="Music note exercise">
+      <svg id="staff" viewBox="0 0 800 280" preserveAspectRatio="xMidYMid meet"
+        role="img" aria-labelledby="staff-title">
+        <title id="staff-title">Music note to play</title>
+        <g id="staff-lines" stroke="#18222d" stroke-width="2"></g>
+        <g id="ledger-lines" stroke="#18222d" stroke-width="2"></g>
+        <g id="treble-clef" fill="#18222d" aria-hidden="true">
+          <path transform="translate(51 95) scale(.065)"
+            d="M 592.10873,1275.9669 C 461.75172,1268.3902 328.65904,1186.6265 249.0601,1092.783 C 156.77394,983.97782 118.72592,836.04683 128.47199,714.56357 C 157.10277,357.61288 545.27831,146.63848 688.97108,-9.280262 C 785.15294,-113.64625 805.31643,-164.52308 826.79977,-218.19949 C 868.39181,-322.09965 875.09166,-443.8341 792.63375,-452.92251 C 713.90712,-461.59988 649.13737,-337.79201 620.20973,-253.17845 C 594.19587,-177.07331 576.90507,-100.71696 592.5563,13.979673 C 599.58954,65.50958 793.18636,1503.9125 796.45179,1526.2088 C 829.05589,1749.0255 701.63092,1841.2249 571.55248,1857.6251 C 290.65671,1893.038 200.52617,1607.5843 326.4212,1499.1719 C 423.34291,1415.7001 564.35026,1487.3615 556.73245,1624.5919 C 549.98693,1746.1391 430.80546,1749.7197 400.35244,1746.9429 C 447.10065,1830.7846 799.52998,1874.5871 745.41513,1495.7923 C 737.811,1442.5634 558.91549,90.842953 554.53112,60.595454 C 521.71238,-165.84753 516.71147,-345.08557 634.69182,-554.25141 C 678.24767,-631.46637 747.0821,-681.3156 780.87362,-674.7893 C 788.29962,-673.35526 795.69824,-670.62872 801.57144,-664.56827 C 892.07191,-571.31845 919.83494,-364.53202 909.9199,-245.74332 C 899.76736,-124.11391 894.1088,1.7993735 773.16902,148.63428 C 726.36601,205.45738 583.54553,330.63538 501.65851,402.55255 C 386.60107,503.59831 303.14756,591.85179 257.99323,698.31862 C 207.24886,817.97506 198.65826,968.6006 313.27268,1102.2505 C 379.20247,1177.7619 488.59222,1231.3424 580.65459,1232.4842 C 836.63719,1235.6628 911.39048,1109.4801 913.77904,966.58197 C 917.71126,731.28351 633.64596,642.32214 516.85762,804.10953 C 449.14212,897.92109 478.90552,996.66049 524.38411,1043.6371 C 539.99424,1059.7587 557.43121,1072.0395 573.92734,1078.8855 C 579.9056,1081.3654 593.96751,1087.9054 589.97593,1097.4779 C 586.6557,1105.4428 580.20702,1105.8904 574.33381,1105.1871 C 500.68573,1096.3544 419.13667,1025.958 399.0828,904.87212 C 369.86288,728.38801 525.6035,519.0349 747.9133,553.274 C 893.45572,575.68903 1028.5853,700.92182 1016.7338,934.11946 C 1006.5722,1133.9822 840.87996,1290.4262 592.10873,1275.9669 z"></path>
+        </g>
+        <g id="bass-clef" fill="#18222d" aria-hidden="true" display="none">
+          <circle cx="79" cy="105" r="12"></circle>
+          <path transform="translate(-35 -283) scale(1.05)"
+            d="M 95.859988,371.63448 C 90.264914,352.12932 103.76008,339.25423 121.5486,338.83318 C 139.5916,338.41213 151.02486,354.43377 151.409,369.22065 C 152.04763,384.00753 145.3852,396.1505 131.91497,410.73661 C 120.87703,422.89747 99.665017,432.61417 98.088584,431.20186 C 96.332204,429.78955 114.29957,421.85513 125.47619,409.09796 C 132.40912,401.00465 139.51693,383.91281 138.91821,371.2671 C 137.87516,354.61161 124.4834,345.01552 119.25108,344.06033 C 115.79939,343.34942 112.38667,344.18009 109.07043,345.73636 C 106.34185,347.07037 104.63525,349.73327 104.56631,351.1916 C 104.4033,354.38523 108.47495,356.28672 110.68634,356.95999 C 118.94456,359.45486 107.09689,380.69396 95.859988,371.63448 z"></path>
+          <circle cx="139" cy="92.5" r="6"></circle>
+          <circle cx="139" cy="117.5" r="6"></circle>
+        </g>
+        <g id="note" fill="#18222d" stroke="#18222d">
+          <ellipse id="note-head" cx="380" cy="180" rx="17" ry="12"
+            transform="rotate(-16 380 180)"></ellipse>
+          <line id="stem" x1="395" y1="180" x2="395" y2="112" stroke-width="4"></line>
+        </g>
+        <text id="answer-label" x="690" y="148" text-anchor="middle" fill="#18222d"
+          font-family="system-ui, sans-serif" font-size="38" font-weight="700"></text>
+      </svg>
+    </section>
+
+    <p id="feedback" class="visually-hidden" role="status" aria-live="polite">Play the note shown.</p>
+  </main>
+
+  <script>
+    const exercises = [
+      { name: "F2", midi: 53, clef: "bass", staffIndex: 6 },
+      { name: "G2", midi: 55, clef: "bass", staffIndex: 7 },
+      { name: "A2", midi: 57, clef: "bass", staffIndex: 8 },
+      { name: "B2", midi: 59, clef: "bass", staffIndex: 9 },
+      { name: "C3", midi: 60, clef: "treble", staffIndex: -2 },
+      { name: "D3", midi: 62, clef: "treble", staffIndex: -1 },
+      { name: "E3", midi: 64, clef: "treble", staffIndex: 0 },
+      { name: "F3", midi: 65, clef: "treble", staffIndex: 1 },
+      { name: "G3", midi: 67, clef: "treble", staffIndex: 2 }
+    ];
+
+    const elements = {
+      clef: document.querySelector("#clef"),
+      labels: document.querySelector("#labels"),
+      newNote: document.querySelector("#new-note"),
+      enableMidi: document.querySelector("#enable-midi"),
+      midiDevice: document.querySelector("#midi-device"),
+      midiStatus: document.querySelector("#midi-status"),
+      staffLines: document.querySelector("#staff-lines"),
+      ledgerLines: document.querySelector("#ledger-lines"),
+      trebleClef: document.querySelector("#treble-clef"),
+      bassClef: document.querySelector("#bass-clef"),
+      note: document.querySelector("#note"),
+      noteHead: document.querySelector("#note-head"),
+      stem: document.querySelector("#stem"),
+      answerLabel: document.querySelector("#answer-label"),
+      feedback: document.querySelector("#feedback"),
+      staffTitle: document.querySelector("#staff-title")
+    };
+
+    let midiAccess;
+    let currentInput;
+    let currentExercise;
+    let isAdvancing = false;
+    let advanceTimer;
+
+    for (let i = 0; i < 5; i += 1) {
+      const y = 80 + (i * 25);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", "42");
+      line.setAttribute("x2", "638");
+      line.setAttribute("y1", y);
+      line.setAttribute("y2", y);
+      elements.staffLines.append(line);
+    }
+
+    function chooseExercise() {
+      clearTimeout(advanceTimer);
+      isAdvancing = false;
+      const selection = elements.clef.value;
+      const available = selection === "both"
+        ? exercises
+        : exercises.filter((exercise) => exercise.clef === selection);
+      let index;
+
+      do {
+        index = Math.floor(Math.random() * available.length);
+      } while (
+        currentExercise &&
+        currentExercise.midi === available[index].midi &&
+        available.length > 1
+      );
+
+      currentExercise = available[index];
+      renderExercise();
+      setNoteColor("var(--ink)");
+      setFeedback("Play the note shown.");
+    }
+
+    function renderExercise() {
+      const { clef, staffIndex, name } = currentExercise;
+      const y = 180 - (staffIndex * 12.5);
+      const stemUp = staffIndex < 5;
+
+      elements.trebleClef.setAttribute("display", clef === "treble" ? "inline" : "none");
+      elements.bassClef.setAttribute("display", clef === "bass" ? "inline" : "none");
+      renderLedgerLines(staffIndex);
+
+      elements.noteHead.setAttribute("cy", y);
+      elements.noteHead.setAttribute("transform", `rotate(-16 380 ${y})`);
+      elements.stem.setAttribute("x1", stemUp ? "395" : "365");
+      elements.stem.setAttribute("x2", stemUp ? "395" : "365");
+      elements.stem.setAttribute("y1", y);
+      elements.stem.setAttribute("y2", stemUp ? y - 68 : y + 68);
+
+      elements.answerLabel.textContent = elements.labels.value === "shown" ? name : "";
+      elements.staffTitle.textContent =
+        `${clef === "treble" ? "Treble" : "Bass"} clef note ${name}`;
+    }
+
+    function renderLedgerLines(staffIndex) {
+      elements.ledgerLines.replaceChildren();
+      const ledgerIndexes = [];
+
+      for (let index = -2; index >= staffIndex; index -= 2) ledgerIndexes.push(index);
+      for (let index = 10; index <= staffIndex; index += 2) ledgerIndexes.push(index);
+
+      ledgerIndexes.forEach((index) => {
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        const y = 180 - (index * 12.5);
+        line.setAttribute("x1", "352");
+        line.setAttribute("x2", "408");
+        line.setAttribute("y1", y);
+        line.setAttribute("y2", y);
+        elements.ledgerLines.append(line);
+      });
+    }
+
+    function setNoteColor(color) {
+      elements.note.setAttribute("fill", color);
+      elements.note.setAttribute("stroke", color);
+      elements.answerLabel.setAttribute("fill", color);
+    }
+
+    function setFeedback(message) {
+      elements.feedback.textContent = message;
+    }
+
+    function handleNote(midiNote) {
+      if (!currentExercise || isAdvancing) return;
+
+      if (midiNote === currentExercise.midi) {
+        isAdvancing = true;
+        setNoteColor("var(--correct)");
+        setFeedback(`Correct — ${currentExercise.name}.`);
+        advanceTimer = setTimeout(chooseExercise, 700);
+      } else {
+        setNoteColor("var(--wrong)");
+        setFeedback(`You played ${midiName(midiNote)}. Try the same note again.`);
+      }
+    }
+
+    function midiName(midiNote) {
+      const names = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
+      return `${names[midiNote % 12]}${Math.floor(midiNote / 12) - 2}`;
+    }
+
+    function onMidiMessage(event) {
+      const [status, note, velocity] = event.data;
+      if ((status & 0xf0) === 0x90 && velocity > 0) {
+        handleNote(note);
+      }
+    }
+
+    function listMidiInputs() {
+      const inputs = [...midiAccess.inputs.values()];
+      const selectedId = currentInput?.id;
+      elements.midiDevice.replaceChildren();
+
+      if (inputs.length === 0) {
+        currentInput = undefined;
+        elements.midiDevice.add(new Option("No MIDI input connected", ""));
+        elements.midiDevice.disabled = true;
+        elements.midiStatus.textContent = "MIDI access enabled. Connect or power on a keyboard.";
+        return;
+      }
+
+      inputs.forEach((input) => elements.midiDevice.add(new Option(input.name || "MIDI input", input.id)));
+      elements.midiDevice.disabled = false;
+      elements.midiDevice.value = inputs.some((input) => input.id === selectedId)
+        ? selectedId
+        : inputs[0].id;
+      selectMidiInput();
+    }
+
+    function selectMidiInput() {
+      if (currentInput) currentInput.onmidimessage = null;
+      currentInput = midiAccess.inputs.get(elements.midiDevice.value);
+
+      if (currentInput) {
+        currentInput.onmidimessage = onMidiMessage;
+        elements.midiStatus.textContent = `Listening to ${currentInput.name || "MIDI input"}.`;
+      }
+    }
+
+    async function enableMidi() {
+      if (!navigator.requestMIDIAccess) {
+        setFeedback("This browser does not support Web MIDI. Use Chrome or Edge.", "wrong");
+        return;
+      }
+
+      try {
+        midiAccess = await navigator.requestMIDIAccess();
+        midiAccess.onstatechange = listMidiInputs;
+        elements.enableMidi.textContent = "MIDI connected";
+        elements.enableMidi.disabled = true;
+        listMidiInputs();
+      } catch (error) {
+        elements.midiStatus.textContent =
+          error.name === "SecurityError"
+            ? "MIDI requires a secure page (HTTPS or localhost)."
+            : "MIDI permission was not granted.";
+      }
+    }
+
+    elements.enableMidi.addEventListener("click", enableMidi);
+    elements.midiDevice.addEventListener("change", selectMidiInput);
+    elements.newNote.addEventListener("click", chooseExercise);
+    elements.clef.addEventListener("change", chooseExercise);
+    elements.labels.addEventListener("change", renderExercise);
+
+    chooseExercise();
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./service-worker.js").catch((error) => {
+          console.error("Service worker registration failed:", error);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
