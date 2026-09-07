@@ -176,15 +176,6 @@
       <summary aria-label="Open settings">⚙</summary>
       <div class="settings-panel">
         <h1>Settings</h1>
-        <label>
-          Clef
-          <select id="clef">
-            <option value="both">Treble + bass</option>
-            <option value="treble">Treble (G clef)</option>
-            <option value="bass">Bass (F clef)</option>
-          </select>
-        </label>
-        <button id="fullscreen" type="button">Enter fullscreen</button>
         <div class="midi-panel">
           <button class="primary" id="enable-midi" type="button">Connect MIDI keyboard</button>
           <select id="midi-device" aria-label="MIDI input device" disabled>
@@ -239,8 +230,6 @@
     ];
 
     const elements = {
-      clef: document.querySelector("#clef"),
-      fullscreen: document.querySelector("#fullscreen"),
       enableMidi: document.querySelector("#enable-midi"),
       midiDevice: document.querySelector("#midi-device"),
       midiStatus: document.querySelector("#midi-status"),
@@ -278,21 +267,17 @@
       clearTimeout(advanceTimer);
       isAdvancing = false;
       answerRevealed = false;
-      const selection = elements.clef.value;
-      const available = selection === "both"
-        ? exercises
-        : exercises.filter((exercise) => exercise.clef === selection);
       let index;
 
       do {
-        index = Math.floor(Math.random() * available.length);
+        index = Math.floor(Math.random() * exercises.length);
       } while (
         currentExercise &&
-        currentExercise.midi === available[index].midi &&
-        available.length > 1
+        currentExercise.midi === exercises[index].midi &&
+        exercises.length > 1
       );
 
-      currentExercise = available[index];
+      currentExercise = exercises[index];
       renderExercise();
       setNoteColor("var(--ink)");
       setFeedback("Tap to reveal the note name.");
@@ -355,6 +340,7 @@
     function handleTap() {
       if (isAdvancing) return;
 
+      enterFullscreen();
       if (answerRevealed) {
         chooseExercise();
       } else {
@@ -441,33 +427,19 @@
       }
     }
 
-    async function toggleFullscreen() {
-      try {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen();
-        } else {
-          await document.documentElement.requestFullscreen({ navigationUI: "hide" });
-        }
-      } catch (error) {
-        elements.midiStatus.textContent = "Android did not allow fullscreen mode.";
-      }
-    }
+    function enterFullscreen() {
+      if (!document.fullscreenEnabled || document.fullscreenElement) return;
 
-    function updateFullscreenButton() {
-      elements.fullscreen.textContent = document.fullscreenElement
-        ? "Exit fullscreen"
-        : "Enter fullscreen";
+      document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch((error) => {
+        console.error("Fullscreen request failed:", error);
+      });
     }
 
     elements.enableMidi.addEventListener("click", enableMidi);
     elements.midiDevice.addEventListener("change", selectMidiInput);
-    elements.fullscreen.addEventListener("click", toggleFullscreen);
-    document.addEventListener("fullscreenchange", updateFullscreenButton);
     elements.staffCard.addEventListener("click", handleTap);
-    elements.clef.addEventListener("change", chooseExercise);
 
     chooseExercise();
-    elements.fullscreen.hidden = !document.fullscreenEnabled;
 
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
