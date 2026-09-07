@@ -141,6 +141,10 @@
     .staff-card {
       width: 100%;
       height: 100%;
+      cursor: pointer;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
     }
 
     svg {
@@ -180,15 +184,7 @@
             <option value="bass">Bass (F clef)</option>
           </select>
         </label>
-        <label>
-          Note label
-          <select id="labels">
-            <option value="hidden">Hidden</option>
-            <option value="shown">Shown</option>
-          </select>
-        </label>
         <button id="fullscreen" type="button">Enter fullscreen</button>
-        <button id="new-note" type="button">Skip note</button>
         <div class="midi-panel">
           <button class="primary" id="enable-midi" type="button">Connect MIDI keyboard</button>
           <select id="midi-device" aria-label="MIDI input device" disabled>
@@ -199,7 +195,7 @@
       </div>
     </details>
 
-    <section class="staff-card" aria-label="Music note exercise">
+    <section class="staff-card" aria-label="Music note exercise. Tap to reveal the answer, then tap again for the next note.">
       <svg id="staff" viewBox="0 0 800 280" preserveAspectRatio="xMidYMid meet"
         role="img" aria-labelledby="staff-title">
         <title id="staff-title">Music note to play</title>
@@ -226,7 +222,7 @@
       </svg>
     </section>
 
-    <p id="feedback" class="visually-hidden" role="status" aria-live="polite">Play the note shown.</p>
+    <p id="feedback" class="visually-hidden" role="status" aria-live="polite">Tap to reveal the note name.</p>
   </main>
 
   <script>
@@ -244,12 +240,11 @@
 
     const elements = {
       clef: document.querySelector("#clef"),
-      labels: document.querySelector("#labels"),
       fullscreen: document.querySelector("#fullscreen"),
-      newNote: document.querySelector("#new-note"),
       enableMidi: document.querySelector("#enable-midi"),
       midiDevice: document.querySelector("#midi-device"),
       midiStatus: document.querySelector("#midi-status"),
+      staffCard: document.querySelector(".staff-card"),
       staffLines: document.querySelector("#staff-lines"),
       ledgerLines: document.querySelector("#ledger-lines"),
       trebleClef: document.querySelector("#treble-clef"),
@@ -266,6 +261,7 @@
     let currentInput;
     let currentExercise;
     let isAdvancing = false;
+    let answerRevealed = false;
     let advanceTimer;
 
     for (let i = 0; i < 5; i += 1) {
@@ -281,6 +277,7 @@
     function chooseExercise() {
       clearTimeout(advanceTimer);
       isAdvancing = false;
+      answerRevealed = false;
       const selection = elements.clef.value;
       const available = selection === "both"
         ? exercises
@@ -298,7 +295,7 @@
       currentExercise = available[index];
       renderExercise();
       setNoteColor("var(--ink)");
-      setFeedback("Play the note shown.");
+      setFeedback("Tap to reveal the note name.");
     }
 
     function renderExercise() {
@@ -317,7 +314,7 @@
       elements.stem.setAttribute("y1", y);
       elements.stem.setAttribute("y2", stemUp ? y - 68 : y + 68);
 
-      elements.answerLabel.textContent = elements.labels.value === "shown" ? name : "";
+      elements.answerLabel.textContent = answerRevealed ? name : "";
       elements.staffTitle.textContent =
         `${clef === "treble" ? "Treble" : "Bass"} clef note ${name}`;
     }
@@ -350,14 +347,31 @@
       elements.feedback.textContent = message;
     }
 
+    function revealAnswer() {
+      answerRevealed = true;
+      elements.answerLabel.textContent = currentExercise.name;
+    }
+
+    function handleTap() {
+      if (isAdvancing) return;
+
+      if (answerRevealed) {
+        chooseExercise();
+      } else {
+        revealAnswer();
+        setFeedback(`${currentExercise.name}. Tap again for the next note.`);
+      }
+    }
+
     function handleNote(midiNote) {
       if (!currentExercise || isAdvancing) return;
 
       if (midiNote === currentExercise.midi) {
         isAdvancing = true;
+        revealAnswer();
         setNoteColor("var(--correct)");
         setFeedback(`Correct — ${currentExercise.name}.`);
-        advanceTimer = setTimeout(chooseExercise, 700);
+        advanceTimer = setTimeout(chooseExercise, 1000);
       } else {
         setNoteColor("var(--wrong)");
         setFeedback(`You played ${midiName(midiNote)}. Try the same note again.`);
@@ -449,9 +463,8 @@
     elements.midiDevice.addEventListener("change", selectMidiInput);
     elements.fullscreen.addEventListener("click", toggleFullscreen);
     document.addEventListener("fullscreenchange", updateFullscreenButton);
-    elements.newNote.addEventListener("click", chooseExercise);
+    elements.staffCard.addEventListener("click", handleTap);
     elements.clef.addEventListener("change", chooseExercise);
-    elements.labels.addEventListener("change", renderExercise);
 
     chooseExercise();
     elements.fullscreen.hidden = !document.fullscreenEnabled;

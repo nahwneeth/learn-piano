@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-note-trainer-v2";
+const CACHE_NAME = "piano-note-trainer-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
