@@ -252,6 +252,9 @@
     let isAdvancing = false;
     let answerRevealed = false;
     let advanceTimer;
+    let wakeLock;
+    let wakeLockRequest;
+    let keepAwake = false;
 
     for (let i = 0; i < 5; i += 1) {
       const y = 80 + (i * 25);
@@ -340,6 +343,7 @@
     function handleTap() {
       if (isAdvancing) return;
 
+      enableWakeLock();
       enterFullscreen();
       if (answerRevealed) {
         chooseExercise();
@@ -408,6 +412,8 @@
     }
 
     async function enableMidi() {
+      enableWakeLock();
+
       if (!navigator.requestMIDIAccess) {
         setFeedback("This browser does not support Web MIDI. Use Chrome or Edge.", "wrong");
         return;
@@ -427,6 +433,35 @@
       }
     }
 
+    function enableWakeLock() {
+      keepAwake = true;
+      requestWakeLock();
+    }
+
+    async function requestWakeLock() {
+      if (
+        !keepAwake ||
+        !("wakeLock" in navigator) ||
+        document.visibilityState !== "visible" ||
+        wakeLock ||
+        wakeLockRequest
+      ) {
+        return;
+      }
+
+      wakeLockRequest = navigator.wakeLock.request("screen");
+      try {
+        wakeLock = await wakeLockRequest;
+        wakeLock.addEventListener("release", () => {
+          wakeLock = undefined;
+        });
+      } catch (error) {
+        console.error("Screen wake lock failed:", error);
+      } finally {
+        wakeLockRequest = undefined;
+      }
+    }
+
     function enterFullscreen() {
       if (!document.fullscreenEnabled || document.fullscreenElement) return;
 
@@ -438,6 +473,9 @@
     elements.enableMidi.addEventListener("click", enableMidi);
     elements.midiDevice.addEventListener("change", selectMidiInput);
     elements.staffCard.addEventListener("click", handleTap);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") requestWakeLock();
+    });
 
     chooseExercise();
 
